@@ -1,0 +1,221 @@
+class CubeGroup(VGroup):
+    def __init__(self, a = 3, **kwargs):
+        super().__init__(**kwargs)
+        # координаты точек
+        A = np.array([-a/2, -a/2, -a/2])
+        B = np.array([-a/2, a/2, -a/2])
+        C = np.array([a/2, a/2, -a/2])
+        D = np.array([a/2, -a/2, -a/2])
+
+        A1 = np.array([-a/2, -a/2, a/2])
+        B1 = np.array([-a/2, a/2, a/2])
+        C1 = np.array([a/2, a/2, a/2])
+        D1 = np.array([a/2, -a/2, a/2])
+
+        pA, pB, pC, pD = [Dot3D(p, radius=0.012, color = WHITE) for p in [A, B, C, D]]
+        pA1, pB1, pC1, pD1 = [Dot3D(p, radius=0.012, color = WHITE) for p in [A1, B1, C1, D1]]
+        # тетраэдр
+        lines = VGroup()
+        rows = [
+            (A, B), (B, C), (C, D), (A, D),
+            (A1, B1), (B1, C1), (C1, D1), (A1, D1),
+            (A, A1), (B, B1), (C, C1), (D, D1)
+        ]
+        for s in rows:
+            line = Line(
+                s[0], s[1]
+            ).set_stroke(WHITE, 2.2)
+            lines.add(line)
+
+        self.add(pA, pB, pC, pD, pA1, pB1, pC1, pD1, lines)
+
+
+class SectionCube(ThreeDScene):
+    def construct(self):
+        # два измерения
+        self.set_camera_orientation(
+            phi = 70 * DEGREES, 
+            theta = - 70 * DEGREES,
+            zoom = 1
+        ) 
+        #
+        back = ImageMobject('frame.png').to_corner(RIGHT, buff = 0)
+        #self.add_fixed_in_frame_mobjects(back)
+        # основные объекты
+        cube = CubeGroup()
+        pA, pB, pC, pD, pA1, pB1, pC1, pD1 = [cube[i] for i in range(8)]
+        # точки сечения
+        M = Dot3D([-1.5, -1.5, 0])
+        N = Dot3D([1.5, 0.1, -1.5])
+        B1 = Dot3D(pB1.get_center())
+        K = Dot3D([-1.5, -4.42, -1.5])
+        P = Dot3D([0.46, -1.5, -1.5])
+
+        # лейблы
+        O = midpoint(pA.get_center(), pC1.get_center())
+        labels = MathTex('A', 'B', 'C', 'D', 'A_1', 'B_1', 'C_1', 'D_1', 'M', 'N', 'P', 'K', font_size = 23)
+        background = VGroup()
+        for i, s in enumerate([pA, pB, pC, pD, pA1, pB1, pC1, pD1, M, N, P, K]):
+            vec = extend_segment_1(O, s.get_center(), 0.1)
+            labels[i].next_to(s.get_center(), vec, buff = 0.1).set_z_index(3)
+            back = BackgroundRectangle(labels[i], color = BLACK, fill_opacity=0.5).set_z_index(2)
+            self.add_fixed_orientation_mobjects(labels[i], back)
+            self.remove(labels[i], back)
+            background.add(back)
+        label_group = VGroup(labels, background)
+        labels[11].next_to(K.get_center(), np.array([-1, 0, 1]))
+
+        
+
+
+
+        # отрезки сечения
+        B1M = Line(B1.get_center(), M.get_center())
+        MK = Line(M.get_center(), K.get_center())
+        AK = Line(pA.get_center(), K.get_center())
+        KN = Line(K.get_center(), N.get_center())
+        MP = Line(M.get_center(), P.get_center())
+        
+
+        # выделение плосостей и прямых
+        Polygon.set_default(fill_color = BLUE_B, fill_opacity = 0.2, stroke_opacity = 0)
+
+        area_ABB1 = Polygon(
+            pA.get_center(), pB.get_center(), pB1.get_center(), pA1.get_center())
+        area_ABC = Polygon(
+            pA.get_center(), pB.get_center(), pC.get_center(), pD.get_center())
+        area_ADD1 = Polygon(
+            pA.get_center(), pD.get_center(), pD1.get_center(), pA1.get_center())
+        AB = Line(pA.get_center(), pB.get_center(), stroke_width=3, stroke_color=GREEN_C)
+
+
+
+        # неверное решение
+        F1 = extend_segment_1(pD.get_center(), pA.get_center(), 1.2)
+        F2 = extend_segment_1(pB1.get_center(), M.get_center(), 2)
+        F = Dot3D(extend_segment_1(pB1.get_center(), M.get_center(), 1.65))
+        AF = Line(pA.get_center(), F1, stroke_color=PURE_RED)
+        MF = Line(M.get_center(), F2, stroke_color=PURE_RED)
+        FN = Line(F, N.get_center(), stroke_color=PURE_RED)
+
+        screen = Rectangle(4, 8).set_fill(RED, 0.4)
+        self.add_fixed_in_frame_mobjects(screen)
+        self.remove(screen)
+
+
+        # анимации
+        self.add(cube, labels[:8], background[:8])
+        self.wait()
+        dots_sections = VGroup(B1, M, N, labels[8:10])
+        self.play(FadeIn(dots_sections))
+        self.wait()
+        # соединяем B1 M
+        self.play(FadeIn(area_ABB1))
+        self.play(Create(B1M), run_time = 1.5)
+        self.wait()
+        self.play(FadeOut(area_ABB1))
+        self.wait()
+        # ошибка 1
+        self.play(
+            Create(AF),
+            Create(MF),
+            run_time = 2
+        )
+        self.play(FadeIn(F))
+        self.wait()
+        self.play(Create(FN), run_time=1.5)
+        self.wait()
+        self.move_camera(
+            phi = 70 * DEGREES, 
+            theta = 290 * DEGREES,
+            run_time = 9,
+            **EASE
+        )
+        self.wait()
+        self.play(
+            Uncreate(AF),
+            Uncreate(MF),
+            Uncreate(FN),
+            FadeOut(F),
+            run_time = 1.5
+        )
+        self.wait(2)
+
+        # построение
+        self.play(FadeIn(AB))
+        self.wait()
+        self.play(
+            FadeIn(area_ABB1),
+            FadeIn(area_ABC)
+        )
+        self.play(
+            Create(AK),
+            Create(MK),
+            run_time = 2
+        )
+        self.play(FadeIn(K), FadeIn(labels[11]))
+        self.wait()
+        self.play(FadeOut(AB))
+        self.play(
+            FadeOut(area_ABB1),
+            FadeOut(area_ABC)
+        )
+        self.wait()
+        self.play(
+            Create(KN),
+            FadeIn(P),
+            lag_ratio = 0.5, run_time = 2
+        )
+        self.play(FadeIn(labels[10]), FadeIn(background[10]))
+        self.wait()
+        self.play(FadeIn(area_ADD1))
+        self.play(Create(MP))
+        self.wait()
+        self.play(FadeOut(area_ADD1))
+        self.wait()
+        self.move_camera(
+            phi = 70 * DEGREES, 
+            theta = (290 + 360) * DEGREES,
+            run_time = 10,
+            **EASE
+        )
+        self.wait(2)
+
+class How(ThreeDScene):
+    def construct(self):
+        self.set_camera_orientation(
+            phi = 70 * DEGREES, 
+            theta = - 70 * DEGREES,
+            zoom = 1.1
+        ) 
+
+        # координаты точек
+        a = 3
+        A = np.array([-a/2, -a/2, -a/2])
+        B = np.array([-a/2, a/2, -a/2])
+        C = np.array([a/2, a/2, -a/2])
+        D = np.array([a/2, -a/2, -a/2])
+
+        A1 = np.array([-a/2, -a/2, a/2])
+        B1 = np.array([-a/2, a/2, a/2])
+        C1 = np.array([a/2, a/2, a/2])
+        D1 = np.array([a/2, -a/2, a/2])
+
+        pA, pB, pC, pD = [Dot3D(p, radius=0.001, color = WHITE) for p in [A, B, C, D]]
+        pA1, pB1, pC1, pD1 = [Dot3D(p, radius=0.001, color = WHITE) for p in [A1, B1, C1, D1]]
+        # тетраэдр
+        lines = VGroup()
+        rows = [
+            (A, B), (B, C), (C, D), (A, D),
+            (A1, B1), (B1, C1), (C1, D1), (A1, D1),
+            (A, A1), (B, B1), (C, C1), (D, D1)
+        ]
+        for s in rows:
+            line = Line3D(
+                s[0], s[1], thickness=0.005, color=WHITE
+            )
+            lines.add(line)
+
+        N = Dot3D([1.5, 0.1, -1.5])
+
+        self.add(pA, pB, pC, pD, pA1, pB1, pC1, pD1, lines, N)
